@@ -1,0 +1,234 @@
+/// The schema for snapshots
+/// Based on v1.16.7: https://github.com/solana-labs/solana/commit/1a6d77a1a5f43159f0f6686c76535a7b9761bde7
+syntax = "proto3";
+
+package solana.snapshot;
+
+message Snapshot {
+  Bank bank = 1;
+}
+
+/// https://github.com/solana-labs/solana/blob/1a6d77a1a5f43159f0f6686c76535a7b9761bde7/runtime/src/bank.rs#L654-L693
+message Bank {
+  uint64 epoch = 1;
+  uint64 block_height = 2;
+  uint64 slot = 3;
+  bytes hash = 4;
+  optional bytes epoch_accounts_hash = 5;
+  uint64 signature_count = 6;
+  uint64 capitalization = 7;
+  uint64 parent_slot = 8;
+  bytes parent_hash = 9;
+  uint64 transaction_count = 10;
+  uint64 tick_height = 11;
+  uint64 max_tick_height = 12;
+  optional uint64 hashes_per_tick = 13;
+  uint64 ticks_per_slot = 14;
+  uint64 ns_per_slot = 15; // NOTE: originally a u128
+  double slots_per_year = 16;
+  bytes collector_id = 17;
+  uint64 collector_fees = 18;
+  uint64 collected_rent = 19;
+  uint64 accounts_data_size = 20;
+  bool is_delta = 21;
+  repeated uint64 ancestors = 22;
+  int64 genesis_creation_time = 23;
+  Inflation inflation = 24;
+  repeated HardFork hard_forks = 25;
+  FeeRateGovernor fee_rate_governor = 26;
+  optional IncrementalSnapshotPersistence incremental_snapshot_persistence = 27;
+  RentCollector rent_collector = 28;
+  EpochSchedule epoch_schedule = 29; // TODO: Is this a duplicate of what's in RentCollector?
+  BlockhashQueue blockhash_queue = 30;
+  Stakes stakes = 31;
+  repeated EpochStake epoch_stakes = 32;
+  optional EpochRewards epoch_rewards = 33;
+  // FeeCalculator fee_calculator = 99 [deprecated = true]; // TODO: confirm this is unused
+}
+
+message Inflation {
+  double initial = 1;
+  double terminal = 2;
+  double taper = 3;
+  double foundation = 4;
+  double foundation_term = 5;
+}
+
+message HardFork {
+  uint64 slot = 1;
+  uint64 count = 2;
+}
+
+message FeeRateGovernor {
+  uint64 lamports_per_signature = 1;
+  uint64 target_signatures_per_slot = 2;
+  uint64 min_lamports_per_signature = 3;
+  uint64 max_lamports_per_signature = 4;
+  uint32 burn_percent = 5; // NOTE: originally a u8
+}
+
+message IncrementalSnapshotPersistence {
+  uint64 full_slot = 1;
+  bytes full_hash = 2;
+  uint64 full_capitalization = 3;
+  bytes incremental_hash = 4;
+  uint64 incremental_capitalization = 5;
+}
+
+message RentCollector {
+  uint64 epoch = 1;
+  EpochSchedule epoch_schedule = 2;
+  double slots_per_year = 3;
+  Rent rent = 4;
+}
+
+message Rent {
+  uint64 lamports_per_byte_year = 1;
+  double exemption_threshold = 2;
+  uint32 burn_percent = 3; // NOTE: originally a u8
+}
+
+message EpochSchedule {
+  uint64 slots_per_epoch = 1;
+  uint64 leader_schedule_slot_offset = 2;
+  bool warmup = 3;
+  uint64 first_normal_epoch = 4;
+  uint64 first_normal_slot = 5;
+}
+
+message BlockhashQueue {
+  uint64 last_hash_index = 1;
+  optional bytes last_hash = 2; // TODO: Do we need this field? Can it be computed from last_hash_index?
+  repeated Age ages = 3;
+  uint64 max_age = 4;
+
+  message Age {
+    bytes hash = 1;
+    uint64 hash_index = 2;
+    uint64 timestamp = 3;
+    FeeCalculator fee_calculator = 4;
+  }
+}
+
+message FeeCalculator {
+  uint64 lamports_per_signature = 1;
+}
+
+message EpochStake {
+  uint64 epoch = 1;
+  uint64 total_stake = 2;
+  Stakes stakes = 3;
+  repeated NodeIdToVoteAccounts node_ids_to_vote_accounts = 4;
+  repeated EpochAuthorizedVoter epoch_authorized_voters = 5;
+
+  message NodeIdToVoteAccounts {
+    bytes node_id = 1;
+    uint64 total_stake = 2;
+    repeated bytes vote_accounts = 3;
+  }
+  message EpochAuthorizedVoter {
+    bytes vote_account = 1;
+    bytes authorized_voter = 2;
+  }
+}
+
+message Stakes {
+  uint64 epoch = 1;
+  repeated VoteAccountsEntry vote_accounts = 2;
+  repeated StakeDelegationsEntry stake_delegations = 3;
+  repeated StakeHistory stake_history = 4;
+
+  message VoteAccountsEntry {
+    bytes pubkey = 1;
+    uint64 stake = 2;
+    Account vote_account = 3;
+  }
+  message StakeDelegationsEntry {
+    bytes pubkey = 1;
+    StakeDelegation delegation = 2;
+
+    message StakeDelegation {
+      bytes voter_pubkey = 1;
+      uint64 stake = 2;
+      uint64 activation_epoch = 3;
+      uint64 deactivation_epoch = 4;
+      double warmup_cooldown_rate =5;
+    }
+  }
+  message StakeHistory {
+    uint64 epoch = 1;
+    uint64 effective = 2;
+    uint64 activating = 3;
+    uint64 deactivating = 4;
+  }
+}
+
+message EpochRewards {
+  uint64 start_block_height = 1;
+  repeated EpochStakeReward epoch_stake_rewards = 2;
+
+  message EpochStakeReward {
+    bytes stake_pubkey = 1;
+    Account stake_account = 2;
+    RewardInfo stake_reward_info = 3;
+
+    message RewardInfo {
+      RewardKind reward_kind = 1;
+      uint64 lamports = 2;
+      uint64 post_balance = 3;
+      optional uint32 commission = 4; // NOTE: originally a u8
+
+      enum RewardKind {
+        Fee = 0;
+        Rent = 1;
+        Staking = 2;
+        Voting = 3;
+      }
+    }
+  }
+}
+
+message Account {
+  uint64 lamports = 1;
+  bytes data = 2;
+  bytes owner = 3;
+  bool executable = 4;
+  uint64 rent_epoch = 5;
+}
+
+//pub struct BankFieldsToDeserialize {
+//    pub(crate) blockhash_queue: BlockhashQueue,
+//    pub(crate) ancestors: AncestorsForSerialization,
+//    pub(crate) hash: Hash,
+//    pub(crate) parent_hash: Hash,
+//    pub(crate) parent_slot: Slot,
+//    pub(crate) hard_forks: HardForks,
+//    pub(crate) transaction_count: u64,
+//    pub(crate) tick_height: u64,
+//    pub(crate) signature_count: u64,
+//    pub(crate) capitalization: u64,
+//    pub(crate) max_tick_height: u64,
+//    pub(crate) hashes_per_tick: Option<u64>,
+//    pub(crate) ticks_per_slot: u64,
+//    pub(crate) ns_per_slot: u128,
+//    pub(crate) genesis_creation_time: UnixTimestamp,
+//    pub(crate) slots_per_year: f64,
+//    pub(crate) slot: Slot,
+//    pub(crate) epoch: Epoch,
+//    pub(crate) block_height: u64,
+//    pub(crate) collector_id: Pubkey,
+//    pub(crate) collector_fees: u64,
+//    pub(crate) fee_calculator: FeeCalculator,
+//    pub(crate) fee_rate_governor: FeeRateGovernor,
+//    pub(crate) collected_rent: u64,
+//    pub(crate) rent_collector: RentCollector,
+//    pub(crate) epoch_schedule: EpochSchedule,
+//    pub(crate) inflation: Inflation,
+//    pub(crate) stakes: Stakes<Delegation>,
+//    pub(crate) epoch_stakes: HashMap<Epoch, EpochStakes>,
+//    pub(crate) is_delta: bool,
+//    pub(crate) accounts_data_len: u64,
+//    pub(crate) incremental_snapshot_persistence: Option<BankIncrementalSnapshotPersistence>,
+//    pub(crate) epoch_accounts_hash: Option<Hash>,
+//    pub(crate) epoch_reward_status: EpochRewardStatus,
+//}

@@ -1,0 +1,15 @@
+[package]
+name = "protosnap"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE.md"
+publish = false
+
+[dependencies]
+bytemuck = "1.13.1"
+prost = "0.11.9"
+solana-runtime = { git = "https://github.com/brooksprumo/solana.git", rev = "a0e2d58a6f" }
+solana-sdk = { git = "https://github.com/brooksprumo/solana.git", rev = "a0e2d58a6f" }
+
+[build-dependencies]
+prost-build = "0.11.9"
